@@ -15,6 +15,11 @@ files containing "BV" in their name, analogous code is provided for handling
 dynamic arrays of integers, where you can just insert, delete, and access.
 Those are handled in the files containing "Id" in their name.
 
+Apart from the basic operations, the bitvectors implement hybridNext and
+hybridNext0, which look for the next 1/0 from a given position. While this
+can be done by composing rank and select, the given implementations are much
+faster.
+
 Parameterization
 ----------------
 
