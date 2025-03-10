@@ -27,11 +27,9 @@ Chile. Beauchef 851, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 #include "hybridId.h"
 
-extern float ThetaId = 1.0; // Factor * length reads => rebuild as static
+extern float ThetaId = 0.01; // Factor * length reads => rebuild as static
 
-static inline mustFlatten(hybridId B)
-  { return (B->bv.dyn->accesses >= ThetaId*B->bv.dyn->size);
-  }
+static const float Epsilon = 0.1; // do not flatten leaves of size over Epsilon * n
 
 static const float TrfFactor = 0.125; // TrfFactor * MaxLeafSize to justify transferLeft/Right
 
@@ -41,6 +39,12 @@ static const int MinLeavesToBalance = 5; // min number of leaves to balance the 
 
 static const float MinFillFactor = 0.3; // less than this involves rebuild.
                                 // Must be <= Gamma/2
+
+static inline mustFlatten(hybridId B, uint64_t n)
+  { return ((B->bv.dyn->size <= Epsilon * n) && 
+	    (B->bv.dyn->accesses >= ThetaId * B->bv.dyn->size));
+    // return (B->bv.dyn->accesses >= ThetaId*B->bv.dyn->size);
+  }
 
 	// creates an empty hybridId 
 
@@ -668,17 +672,17 @@ static void recompute (hybridId B, uint64_t i, int64_t delta)
 
 	// access B[i], assumes i is right
 
-uint64_t access (hybridId B, uint64_t i, int64_t *delta)
+uint64_t access (hybridId B, uint64_t i, int64_t *delta, uint64_t n)
 
    { uint64_t lsize;
      if (B->type == tDynamic)
         { B->bv.dyn->accesses++;
-	  if (mustFlatten(B))
+	  if (mustFlatten(B,n))
                flatten(B,delta);
           else
              { lsize = hybridIdLength(B->bv.dyn->left);
-               if (i < lsize) return access(B->bv.dyn->left,i,delta);
-               return access(B->bv.dyn->right,i-lsize,delta);
+               if (i < lsize) return access(B->bv.dyn->left,i,delta,n);
+               return access(B->bv.dyn->right,i-lsize,delta,n);
              }
         }
      if (B->type == tLeaf) return leafIdAccess(B->bv.leaf,i);
@@ -688,7 +692,9 @@ uint64_t access (hybridId B, uint64_t i, int64_t *delta)
 uint64_t hybridIdAccess (hybridId B, uint64_t i)
 
    { int64_t delta = 0;
-     uint64_t answ = access(B,i,&delta);
+     uint64_t n = 0;
+     if (B->type == tDynamic) n = B->bv.dyn->size;
+     uint64_t answ = access(B,i,&delta,n);
      if (delta) recompute(B,i,delta);
      return answ;
    }
@@ -696,23 +702,23 @@ uint64_t hybridIdAccess (hybridId B, uint64_t i)
         // read values [i..i+l-1], onto D[0...], of uint64_t
 
 static void sread64 (hybridId B, uint64_t i, uint64_t l, uint64_t *D, 
-		     uint *recomp)
+		     uint *recomp, uint64_t n)
 
    { uint64_t lsize;
      int64_t delta;
      if (B->type == tDynamic)
         { B->bv.dyn->accesses++;
-	  if (mustFlatten(B)) {
+	  if (mustFlatten(B,n)) {
              delta = 0;
 	     flatten(B,&delta);
 	     if (delta) *recomp = 1;
 	     }
           else {
             lsize = hybridIdLength(B->bv.dyn->left);
-            if (i+l < lsize) sread64(B->bv.dyn->left,i,l,D,recomp);
-            else if (i >= lsize) sread64(B->bv.dyn->right,i-lsize,l,D,recomp);
-            else { sread64(B->bv.dyn->left,i,lsize-i,D,recomp);
-                   sread64(B->bv.dyn->right,0,l-(lsize-i),D+(lsize-i),recomp);
+            if (i+l < lsize) sread64(B->bv.dyn->left,i,l,D,recomp,n);
+            else if (i >= lsize) sread64(B->bv.dyn->right,i-lsize,l,D,recomp,n);
+            else { sread64(B->bv.dyn->left,i,lsize-i,D,recomp,n);
+                   sread64(B->bv.dyn->right,0,l-(lsize-i),D+(lsize-i),recomp,n);
                  }
             return;
             }
@@ -724,30 +730,32 @@ static void sread64 (hybridId B, uint64_t i, uint64_t l, uint64_t *D,
 void hybridRead64 (hybridId B, uint64_t i, uint64_t l, uint64_t *D)
 
    { uint recomp = 0; 
-     sread64(B,i,l,D,&recomp);
+     uint64_t n = 0;
+     if (B->type == tDynamic) n = B->bv.dyn->size;
+     sread64(B,i,l,D,&recomp,n);
      if (recomp) rrecompute(B,i,l);
    }
 
         // read values [i..i+l-1], onto D[0...], of uint32_t
 
 static void sread32 (hybridId B, uint64_t i, uint64_t l, uint32_t *D, 
-		     uint *recomp)
+		     uint *recomp, uint64_t n)
 
    { uint64_t lsize;
      int64_t delta;
      if (B->type == tDynamic)
         { B->bv.dyn->accesses++;
-	  if (mustFlatten(B)) {
+	  if (mustFlatten(B,n)) {
              delta = 0;
              flatten(B,&delta);
              if (delta) *recomp = 1;
              }
           else {
             lsize = hybridIdLength(B->bv.dyn->left);
-            if (i+l < lsize) sread32(B->bv.dyn->left,i,l,D,recomp);
-            else if (i >= lsize) sread32(B->bv.dyn->right,i-lsize,l,D,recomp);
-            else { sread32(B->bv.dyn->left,i,lsize-i,D,recomp);
-                   sread32(B->bv.dyn->right,0,l-(lsize-i),D+(lsize-i),recomp);
+            if (i+l < lsize) sread32(B->bv.dyn->left,i,l,D,recomp,n);
+            else if (i >= lsize) sread32(B->bv.dyn->right,i-lsize,l,D,recomp,n);
+            else { sread32(B->bv.dyn->left,i,lsize-i,D,recomp,n);
+                   sread32(B->bv.dyn->right,0,l-(lsize-i),D+(lsize-i),recomp,n);
                  }
             return;
             }
@@ -759,7 +767,9 @@ static void sread32 (hybridId B, uint64_t i, uint64_t l, uint32_t *D,
 void hybridRead32 (hybridId B, uint64_t i, uint64_t l, uint32_t *D)
 
    { uint recomp = 0;
-     sread32(B,i,l,D,&recomp);
+     uint64_t n = 0;
+     if (B->type == tDynamic) n = B->bv.dyn->size;
+     sread32(B,i,l,D,&recomp,n);
      if (recomp) rrecompute(B,i,l);
    }
 
