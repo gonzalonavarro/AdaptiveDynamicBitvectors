@@ -44,7 +44,7 @@ Examples of use
 
 Files access.c, rank.c, select.c, and memory.c are the basic building blocks
 of all the experiments, mixing those queries with updates for the desired
-values of n and q, and measuring times. You can also build on them as examples
-on how to use the operations.
+values of n and q, and measuring times. Execute without parameters to see their
+usage. You can also build on them as examples on how to use the operations.
 
 The file main.c performs more basic tests on the operations.
