@@ -34,7 +34,7 @@ If you don't know 1/q even approximately, theta = 0.01 is relatively safe.
 
 To change b or gamma, modify MaxBlockWords or Gamma in leafBV.c/leafId.c
 
-To change theta/alpha/epsilon, modify Theta/Alpha/Epsilon in hybridBV.c/hybridId.
+To change theta/alpha/epsilon, modify Theta/Alpha/Epsilon in hybridBV.c/hybridId.c
 
 Other inner parameters can also be modified in hybridBV.c/hybridId.c
 
