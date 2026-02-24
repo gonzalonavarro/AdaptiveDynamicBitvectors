@@ -49,7 +49,3 @@ usage. You can also build on them as examples on how to use the operations.
 
 The file main.c performs more basic tests on the operations.
 
-Another title
--------------
-
-Hi
